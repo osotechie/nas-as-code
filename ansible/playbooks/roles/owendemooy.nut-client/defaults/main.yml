@@ -4,8 +4,8 @@ nut_client_service: nut-client
 
 nut_client_ups: ups
 nut_client_server: 0.0.0.0
-nut_client_username: 
-nut_client_password: 
+nut_client_username:
+nut_client_password:
 nut_client_type: secondary
 
 nut_client_state: started
