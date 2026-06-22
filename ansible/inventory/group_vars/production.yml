@@ -114,3 +114,8 @@ storage_mergerfs:
     fstype: fuse.mergerfs
     opts: defaults,nonempty,allow_other,use_ino,cache.files=off,moveonenospc=true,category.create=mfs,dropcacheonclose=true,minfreespace=1G,posix_acl=true,fsname=MergerFS
 
+# nut-client - variable used to configure the nut-client role
+nut_client_ups: dynamix
+nut_client_server: 10.1.1.3
+nut_client_username: #{NUT_CLIENT_USERNAME}#
+nut_client_password: #{NUT_CLIENT_PASSWORD}#
