@@ -1,0 +1,8 @@
+---
+backup_directories:
+  backup:
+    path: /mnt/backup
+  snapshot:
+    path: /mnt/backup/snapshot
+  remote:
+    path: /mnt/backup/remote

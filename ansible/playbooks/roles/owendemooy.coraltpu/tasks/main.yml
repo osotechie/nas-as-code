@@ -1,0 +1,32 @@
+---
+# tasks file for owendemooy.coraltpu
+
+- name: Gather the package facts
+  ansible.builtin.package_facts:
+    manager: auto
+
+- name: Copy Gasket Driver to the host
+  ansible.builtin.copy:
+    src: "{{ role_path }}/files/gasket-dkms_1.0-18_all.deb"
+    dest: /tmp/gasket-dkms_1.0-18_all.deb
+    mode: "0644"
+  when: "'gasket-dkms' not in ansible_facts.packages"
+
+- name: Install Gasket Driver
+  ansible.builtin.apt:
+    deb: /tmp/gasket-dkms_1.0-18_all.deb
+    state: present
+  when: "'gasket-dkms' not in ansible_facts.packages"
+
+- name: Ensure Google Cloud APT Key and Repository have been added.
+  ansible.builtin.deb822_repository:
+    name: CorelEdgeTPU
+    uris: https://packages.cloud.google.com/apt
+    suites: 'coral-edgetpu-stable'
+    components: main
+    signed_by: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+
+- name: Ensure Coral Edge TPU is installed.
+  ansible.builtin.apt:
+    name: [libedgetpu1-std]
+    update_cache: true

@@ -1,0 +1,4 @@
+---
+
+smb_conf: /etc/samba/smb.conf
+smb_daemon: smbd.service

@@ -1,0 +1,235 @@
+# This is a basic workflow to help you get started with Actions
+
+name: Provision
+
+# Controls when the workflow will run
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+        - '**/*.md'
+
+permissions:
+  contents: read
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+
+  deploy:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      max-parallel: 1
+      matrix:
+        environment: [test, production]
+    environment: ${{ matrix.environment }}
+    defaults:
+      run:
+        working-directory: ansible
+
+    steps:
+
+      # STEP - Check-out Rep
+      # ====================
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - name: Check-out Repo
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      # STEP - Connect to Azure
+      # =======================
+      # This step is used to connect to Azure to allow reading of Azure KeyVault in later step
+      - name: Connect to Azure
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
+        with:
+          creds: ${{ secrets.AZURE_SPN_CREDENTIALS }}
+
+      # STEP - Get Azure KeyVault Secrets
+      # =================================
+      # List all secrets in Azure KeyVault, retrieve each value, mask it,
+      # and export as an environment variable for the Replace Tokens step.
+      # Secret names are uppercased with hyphens replaced by underscores
+      # (e.g. 'my-secret' becomes 'MY_SECRET').
+      - name: Get Azure KeyVault Secrets
+        run: |
+          SECRET_NAMES=$(az keyvault secret list --vault-name ${{ secrets.AZURE_KEYVAULT_NAME }} --query "[].name" -o tsv)
+          for SECRET_NAME in $SECRET_NAMES; do
+            SECRET_VALUE=$(az keyvault secret show --name "$SECRET_NAME" --vault-name ${{ secrets.AZURE_KEYVAULT_NAME }} --query value -o tsv)
+            echo "::add-mask::$SECRET_VALUE"
+            ENV_NAME=$(echo "$SECRET_NAME" | tr '[:lower:]-' '[:upper:]_')
+            echo "$ENV_NAME=$SECRET_VALUE" >> $GITHUB_ENV
+          done
+          
+      # STEP - Replace tokens in .yml files
+      # ===================================
+      # Replaces #{TOKEN}# patterns in files with the matching
+      # environment variable. Uses Python for safe handling of special
+      # characters in secret values (no sed/regex escaping issues).
+      # Change TOKEN_FILES to target different file types (e.g. '**/*.env').
+      - name: Replace tokens in .yml files
+        env:
+          TOKEN_FILES: '**/*.yml'
+        run: |
+          python3 << 'EOF'
+          import os, glob, re, sys
+
+          pattern = os.environ.get('TOKEN_FILES', '**/*.yml')
+          count = 0
+          errors = 0
+
+          for path in glob.glob(pattern, recursive=True):
+              try:
+                  with open(path, 'r') as f:
+                      content = f.read()
+
+                  replaced = re.sub(
+                      r'#\{([^}]+)\}#',
+                      lambda m: os.environ.get(m.group(1), m.group(0)),
+                      content
+                  )
+
+                  if replaced != content:
+                      with open(path, 'w') as f:
+                          f.write(replaced)
+                      count += 1
+                      print(f'\u2714 {path}')
+              except Exception:
+                  errors += 1
+                  print(f'\u2716 {path} — failed to process')
+
+          print(f'Done — {count} file(s) updated, {errors} error(s)')
+          if errors > 0:
+              sys.exit(1)
+          EOF
+
+      # STEP - Connect to Wireguard
+      # ===========================
+      # Install and connect to Wireguard
+      - name: Connect to Wireguard
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends resolvconf wireguard
+          echo "${{ secrets.WG_CONFIG_FILE }}" > wg0.conf
+          sudo chmod 600 wg0.conf
+          sudo wg-quick up ./wg0.conf
+
+       # STEP - Add Route to NAS
+      # ========================
+      # Add route to NAS over Wireguard connection 
+      - name: Add Routes
+        run: |
+          sudo ip route add ${{ vars.HOST_IP }} dev wg0 || true
+          ip route show
+          ping ${{ vars.HOST_IP }} -c 5
+
+       # STEP - Add SSH Keys
+      # ====================
+      # Add SSH Key used to connect to NAS, and pin the NAS's host keys
+      # so we refuse to talk to anything else (replaces the previous
+      # trust-on-first-use ssh-keyscan step, which would silently accept
+      # whatever host key the network handed us each run).
+      # NOTE: If the NAS is ever rebuilt and its /etc/ssh/ssh_host_* keys
+      # regenerated, update the NAS_HOST_KEY secret (environment 'nas')
+      # with the new fingerprints or this step will refuse to connect.
+      - name: Add SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          echo "${{ secrets.HOST_FINGERPRINT }}" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      # STEP - Configure ssh  for Docker
+      # ================================
+      # Add the following ssh configs as per docker suggestion https://docs.docker.com/engine/security/protect-access/#ssh-tips          
+      - name: Configure SSH
+        run: |
+          {
+            echo "Host *"
+            echo "  ServerAliveInterval 30"
+            echo "  ServerAliveCountMax 10"
+            echo "  TCPKeepAlive yes"
+            echo "  ConnectTimeout 30"
+            echo "  ControlMaster auto"
+            echo "  ControlPath ~/.ssh/control-%C"
+            echo "  ControlPersist 10m"
+          } >> ~/.ssh/config
+          chmod 600 ~/.ssh/config
+
+      # STEP - Run Ansible Playbook
+      # ===========================
+      # Run Ansible Playbook to deploy to NAS
+      - name: Run Ansible Playbook
+        id: ansible
+        env:
+          ANSIBLE_STDOUT_CALLBACK: default
+          ANSIBLE_CALLBACK_RESULT_FORMAT: yaml
+          ANSIBLE_FORCE_COLOR: "false"
+        run: |
+          set -o pipefail
+          ansible-playbook playbooks/provision.yml --limit ${{ vars.ENV_NAME }} 2>&1 | tee ansible-output.txt
+          echo "ansible_exit=0" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      # STEP - Generate deployment report
+      # ==================================
+      # Parse Ansible output into a readable GitHub Actions Job Summary
+      - name: Generate deployment report
+        if: always()
+        run: |
+          EXIT_CODE=${{ steps.ansible.outcome == 'success' && '0' || '1' }}
+
+          echo "## 🚀 Provision — \`${{ vars.ENV_NAME }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$EXIT_CODE" = "0" ]; then
+            echo "### ✅ Result: **SUCCESS**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ Result: **FAILED**" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Extract and format the PLAY RECAP into a table
+          if grep -q "PLAY RECAP" ansible-output.txt; then
+            echo "### Play Recap" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Host | OK | Changed | Unreachable | Failed | Skipped | Rescued | Ignored |" >> $GITHUB_STEP_SUMMARY
+            echo "|------|----:|--------:|------------:|-------:|--------:|--------:|--------:|" >> $GITHUB_STEP_SUMMARY
+            sed -n '/PLAY RECAP/,/^$/p' ansible-output.txt | grep -v "PLAY RECAP" | grep -v "^$" | while read -r line; do
+              HOST=$(echo "$line" | awk -F: '{print $1}' | xargs)
+              OK=$(echo "$line" | grep -oP 'ok=\K[0-9]+' || echo "0")
+              CHANGED=$(echo "$line" | grep -oP 'changed=\K[0-9]+' || echo "0")
+              UNREACH=$(echo "$line" | grep -oP 'unreachable=\K[0-9]+' || echo "0")
+              FAILED=$(echo "$line" | grep -oP 'failed=\K[0-9]+' || echo "0")
+              SKIPPED=$(echo "$line" | grep -oP 'skipped=\K[0-9]+' || echo "0")
+              RESCUED=$(echo "$line" | grep -oP 'rescued=\K[0-9]+' || echo "0")
+              IGNORED=$(echo "$line" | grep -oP 'ignored=\K[0-9]+' || echo "0")
+              echo "| \`$HOST\` | $OK | $CHANGED | $UNREACH | $FAILED | $SKIPPED | $RESCUED | $IGNORED |" >> $GITHUB_STEP_SUMMARY
+            done
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Full log in a collapsible section
+          echo "<details><summary>📋 Full Ansible Output</summary>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```yaml' >> $GITHUB_STEP_SUMMARY
+          cat ansible-output.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "</details>" >> $GITHUB_STEP_SUMMARY
+
+      # STEP - Fail on playbook error
+      # ==============================
+      # Ensure the workflow fails if the playbook had errors
+      - name: Fail on playbook error
+        if: steps.ansible.outcome != 'success'
+        run: |
+          echo "::error::Ansible playbook failed. See the job summary for details."
+          exit 1
+
+      # STEP - Discconect from Wireguard
+      # ================================
+      # Discconect from Wireguard
+      - name: Disconnect from Wireguard
+        if: always()
+        run: |
+          sudo ip link delete wg0

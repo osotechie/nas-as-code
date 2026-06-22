@@ -1,0 +1,29 @@
+---
+# tasks file for owendemooy.backup
+- name: Ensure Backup related packages are installed.
+  ansible.builtin.apt:
+    name:
+      - wakeonlan
+    state: present
+
+- name: Directories - Ensure required directories exist.
+  ansible.builtin.file:
+    path: "{{ item.value.path }}"
+    state: directory
+    mode: "0755"
+  with_items: "{{ backup_directories | dict2items }}"
+
+- name: Copy Backup and Restore Scripts
+  ansible.builtin.copy:
+    src: "{{ role_path }}/files/"
+    dest: /config
+    mode: "0777"
+
+- name: Ensure Schedule Task exists for Backup Job
+  ansible.builtin.cron:
+    name: "Host Backup"
+    user: root
+    weekday: 0,1,2,3,4,5,6
+    minute: "0"
+    hour: "4"
+    job: "/config/backup.sh |& tee /tmp/backup.log"

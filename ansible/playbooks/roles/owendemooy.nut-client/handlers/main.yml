@@ -1,0 +1,6 @@
+---
+- name: Restart nut-client
+  ansible.builtin.service:
+    name: "{{ nut_client_service }}"
+    state: restarted
+  when: not ansible_check_mode
