@@ -1,0 +1,18 @@
+---
+# tasks file for owendemooy.docker
+- name: Ensure required packages are installed.
+  ansible.builtin.apt:
+    name: [ca-certificates, curl, gnupg]
+
+- name: Ensure Docker GOG Apt Key and Repositrory has been addded.
+  ansible.builtin.deb822_repository:
+    name: Docker
+    uris: https://download.docker.com/linux/ubuntu
+    suites: "{{ ansible_facts['distribution_release'] }}"
+    components: stable
+    signed_by: https://download.docker.com/linux/ubuntu/gpg
+
+- name: Ensure Docker is installed.
+  ansible.builtin.apt:
+    name: [docker-ce, docker-ce-cli, containerd.io, docker-compose, docker-compose-plugin]
+    update_cache: true

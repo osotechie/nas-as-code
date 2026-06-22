@@ -1,0 +1,17 @@
+---
+
+- name: Restart Samba
+  ansible.builtin.systemd:
+    name: "{{ smb_daemon }}"
+    state: restarted
+
+# Whenever you modify smb.conf you should run the command "testparm"
+# to check that you have not made any basic syntactic errors.
+- name: Testparm
+  ansible.builtin.command: >
+        testparm --suppress-prompt
+  register: samba_testparm
+  changed_when: false
+  # output should contain the line:
+  # Loaded services file OK.
+  failed_when: samba_testparm.stderr_lines is not search("Loaded services file OK.")

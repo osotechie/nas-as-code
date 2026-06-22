@@ -1,0 +1,12 @@
+---
+nut_config_path: /etc/nut
+nut_client_service: nut-client
+
+nut_client_ups: dynamix
+nut_client_server: 10.1.1.3
+nut_client_username: user
+nut_client_password: ups
+nut_client_type: secondary
+
+nut_client_state: started
+nut_client_enabled: true

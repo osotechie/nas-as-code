@@ -1,0 +1,28 @@
+---
+# tasks file for owendemooy.storage
+- name: Ensure Storage related packages are installed.
+  ansible.builtin.apt:
+    name:
+      - fuse
+      - mergerfs
+      - mtools
+    state: present
+
+- name: Ensure Storage disks are mounted.
+  ansible.posix.mount:
+    path: "{{ item.value.path }}"
+    src: "{{ item.value.src }}"
+    fstype: "{{ item.value.fstype }}"
+    state: mounted
+  with_items: "{{ storage_disks | dict2items }}"
+  when: storage_disks is defined
+
+- name: Ensure MergerFS fuses are mounted.
+  ansible.posix.mount:
+    path: "{{ item.value.path }}"
+    src: "{{ item.value.src }}"
+    fstype: "{{ item.value.fstype }}"
+    opts: "{{ item.value.opts }}"
+    state: mounted
+  with_items: "{{ storage_mergerfs | dict2items }}"
+  when: storage_mergerfs is defined

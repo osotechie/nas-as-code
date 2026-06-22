@@ -1,0 +1,12 @@
+---
+test:
+    hosts:
+        nas-build-test:
+            ansible_host: 10.1.1.118
+            ansible_user: owen
+
+production:
+    hosts:
+        nas:
+            ansible_host: 10.1.1.118
+            ansible_user: owen

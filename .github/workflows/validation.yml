@@ -1,0 +1,157 @@
+# This is a basic workflow to help you get started with Actions
+
+name: Validation
+
+# Controls when the workflow will run
+on:
+  push:
+    branches-ignore:
+      - main
+  
+  # manually
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  checks: write
+  actions: read
+  security-events: write
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ansible
+    
+    steps:
+   
+      # STEP - Check-out Repo
+      # =====================
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - name: Check-out Repo
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      # STEP - Install dependencies
+      # ===========================
+      # Installs dependencies required for the validation steps
+      - name: Install dependencies
+        run: |
+          pip install ansible-dev-tools
+          ansible-galaxy collection install ansible.posix
+
+      # STEP - YAML syntax check
+      # ========================
+      # Performs a syntax check on all Ansible playbooks to ensure they are correctly formatted
+      - name: YAML syntax check
+        id: syntax
+        run: |
+          echo "## Syntax Check" >> $GITHUB_STEP_SUMMARY
+          if ansible-playbook playbooks/*.yml --syntax-check 2>&1 | tee syntax-output.txt; then
+            echo "syntax_result=success" >> $GITHUB_OUTPUT
+            echo ":white_check_mark: All playbooks passed syntax validation." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "syntax_result=failure" >> $GITHUB_OUTPUT
+            echo ":x: Syntax errors found:" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat syntax-output.txt >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      # STEP - Run ansible-lint (JSON for report)
+      # ==========================================
+      # Runs ansible-lint and captures JSON output for the summary report
+      - name: Run ansible-lint
+        id: lint
+        run: |
+          set -o pipefail
+          ansible-lint playbooks/ -f codeclimate --nocolor 2>/dev/null > lint-results.json || true
+          ansible-lint playbooks/ -f sarif --nocolor 2>/dev/null > lint-results.sarif || true
+          ansible-lint playbooks/ --nocolor 2>&1 | tee lint-output.txt && LINT_EXIT=0 || LINT_EXIT=$?
+          echo "lint_exit=$LINT_EXIT" >> $GITHUB_OUTPUT
+
+      # STEP - Generate test report
+      # ============================
+      # Parses lint results and writes a markdown summary to the GitHub Actions job summary
+      - name: Generate test report
+        if: always()
+        run: |
+          echo "## Ansible Lint Report" >> $GITHUB_STEP_SUMMARY
+
+          TOTAL=$(jq 'length' lint-results.json 2>/dev/null || echo "0")
+          ERRORS=$(jq '[.[] | select(.severity == "major" or .severity == "critical" or .severity == "blocker")] | length' lint-results.json 2>/dev/null || echo "0")
+          WARNINGS=$(jq '[.[] | select(.severity == "minor")] | length' lint-results.json 2>/dev/null || echo "0")
+          INFO=$(jq '[.[] | select(.severity == "info")] | length' lint-results.json 2>/dev/null || echo "0")
+
+          if [ "$TOTAL" -eq 0 ]; then
+            echo ":white_check_mark: **No issues found** — all checks passed!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Severity | Count |" >> $GITHUB_STEP_SUMMARY
+            echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| :x: Errors | $ERRORS |" >> $GITHUB_STEP_SUMMARY
+            echo "| :warning: Warnings | $WARNINGS |" >> $GITHUB_STEP_SUMMARY
+            echo "| :information_source: Info | $INFO |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            echo "<details><summary>:mag: View all findings ($TOTAL)</summary>" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Rule | Severity | File | Message |" >> $GITHUB_STEP_SUMMARY
+            echo "|------|----------|------|---------|" >> $GITHUB_STEP_SUMMARY
+            jq -r '.[] | "| `\(.check_name)` | \(.severity) | `\(.location.path):\(.location.lines.begin)` | \(.description | split("\n")[0]) |"' lint-results.json >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "</details>" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Overall status badge
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          SYNTAX="${{ steps.syntax.outputs.syntax_result }}"
+          LINT_EXIT="${{ steps.lint.outputs.lint_exit }}"
+          if [ "$SYNTAX" = "success" ] && [ "$LINT_EXIT" = "0" ]; then
+            echo "### :rocket: Overall: **PASSED**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### :no_entry: Overall: **FAILED**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      # STEP - Upload SARIF to GitHub Code Scanning
+      # =============================================
+      # Uploads ansible-lint SARIF results so findings appear as code scanning alerts and inline PR annotations
+      - name: Upload SARIF to Code Scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v3
+        with:
+          sarif_file: ansible/lint-results.sarif
+          category: ansible-lint
+        continue-on-error: true
+
+      # STEP - Fail if lint errors
+      # ===========================
+      # Ensures the workflow fails if ansible-lint found issues
+      - name: Fail on lint errors
+        if: steps.lint.outputs.lint_exit != '0'
+        run: |
+          echo "::error::ansible-lint found issues. See the job summary for details."
+          exit 1
+
+      # STEP - Microsoft Security DevOps
+      # ================================
+      # Run a security check for potential misconfigurations and vulnerabilities
+      - name: Run Microsoft Security DevOps
+        uses: microsoft/security-devops-action@08976cb623803b1b36d7112d4ff9f59eae704de0 # v1.12.0
+        id: msdo
+        with:
+          tools: checkov, trivy
+
+      # STEP - Upload Microsoft Security DevOps Results
+      # ===============================================
+      # Upload the results of the Microsoft Security DevOps to the repo
+      - name: Upload Security SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v3
+        with:
+          sarif_file: ${{ steps.msdo.outputs.sarifFile }}
+          category: security-devops
+        continue-on-error: true

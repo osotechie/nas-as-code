@@ -1,0 +1,44 @@
+---
+# tasks file for owendemooy.samba
+- name: Ensure Samba related packages are installed.
+  ansible.builtin.apt:
+    name:
+      - samba
+      - samba-common
+      - cifs-utils
+      - wsdd-server
+    state: present
+
+- name: Ensure Samba is running and set to start on boot.
+  ansible.builtin.service:
+    name: "smbd.service"
+    state: started
+    enabled: true
+
+- name: Configure Samba share(s)
+  ansible.builtin.blockinfile:
+    path: "{{ smb_conf }}"
+    backup: true
+    marker: "# {mark} ANSIBLE MANAGED BLOCK for {{ item.key }}"
+    insertafter: "#===== Share Definitions ====="
+    block: |
+      [{{ item.key }}]
+      path = "{{ item.value.path }}"
+      available = {{ item.value.available }}
+      valid users = {{ item.value.users | join(" ") }}
+      browsable = {{ item.value.browsable }}
+      read only = {{ item.value.readonly }}
+      writable = {{ item.value.writable }}
+  with_items: "{{ samba_shares | dict2items }}"
+  notify: Restart Samba
+
+- name: Set Samba password for samba users
+  ansible.builtin.expect:
+    command: smbpasswd -a {{ item.key }}
+    timeout: 3
+    responses:
+      'New SMB password': "{{ item.value.password }}"
+      'Retype new SMB password': "{{ item.value.password }}"
+  with_items: "{{ samba_users | dict2items }}"
+  no_log: true
+  notify: Restart Samba

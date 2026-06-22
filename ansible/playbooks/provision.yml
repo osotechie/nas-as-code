@@ -1,0 +1,104 @@
+---
+- name: Provision Hosts
+  hosts: all
+  become: true
+
+  tasks:
+
+    # PACKAGES - Ensure latest packages are installed
+    - name: Packages - Ensure latest packages are installed.
+      ansible.builtin.apt:
+        upgrade: true
+
+    - name: Packages - Ensure additional packages are installed.
+      ansible.builtin.apt:
+        pkg: "{{ apt_packages }}"
+
+    # HOST ENTRIES - Ensure Host Entries are present
+    - name: Hosts Entries - Ensuring the /etc/hosts file contains the required entries.
+      ansible.builtin.lineinfile:
+        dest: /etc/hosts
+        regexp: '.*{{ item }}$'
+        line: "{{ hostvars[item].ansible_host }} {{ item }}"
+        state: present
+      when: hostvars[item].ansible_host is defined
+      with_items: "{{ ansible_play_hosts }}"
+
+    # USERS - Ensure the required users are present
+    - name: Ensure the users exists.
+      ansible.builtin.user:
+        name: "{{ item.key }}"
+        comment: "{{ item.value.displayname }}"
+        create_home: true
+      with_items: "{{ users | dict2items }}"
+      no_log: true
+
+    # USERS - Add SSH Authorized Keys for the required users
+    - name: Ensure the users SSH Authorized Keys are present.
+      ansible.posix.authorized_key:
+        user: "{{ item.key }}"
+        key: "{{ item.value.key }}"
+      with_items: "{{ users | dict2items }}"
+      no_log: true
+
+    # DIRECTORIES - Ensure required directories are present
+    - name: Directories - Ensure required directories exist.
+      ansible.builtin.file:
+        path: "{{ item.value.path }}"
+        state: directory
+        mode: "0755"
+      with_items: "{{ host_directories | dict2items }}"
+
+    - name: Directories - Ensure require directories ACLs are correct.
+      ansible.posix.acl:
+        path: "{{ item.0.path }}"
+        entry: "{{ item.1 }}"
+        state: present
+      loop: "{{ host_directories | subelements('acls') }}"
+
+    # ROLES - Ensure Docker Role has been provisioned.
+    - name: Roles - Ensure Docker Role has been provisioned.
+      ansible.builtin.import_role:
+        name: owendemooy.docker
+      when: '"docker" in functions'
+
+    # ROLES - Ensure Storage Role has been provisioned.
+    - name: Roles - Ensure Storage Server Role has been provisioned.
+      ansible.builtin.import_role:
+        name: owendemooy.storage
+      when: '"storage" in functions'
+
+    # ROLES - Ensure Samba Role has been provisioned.
+    - name: Roles - Ensure Samba Role has been provisioned.
+      ansible.builtin.import_role:
+        name: owendemooy.samba
+      when: '"samba" in functions'
+
+    # ROLES - Ensure NUT Client Role has been provisioned.
+    - name: Roles - Ensure NUT Client Role has been provisioned.
+      ansible.builtin.import_role:
+        name: owendemooy.nut-client
+      when: '"nut-client" in functions'
+
+    # ROLES - Ensure Backup Role has been provisioned.
+    - name: Roles - Ensure NAS Backup Role has been provisioned.
+      ansible.builtin.import_role:
+        name: owendemooy.nas-backup
+      when: '"nas-backup" in functions'
+
+    # ROLES - Ensure Coral TPU Role has been provisioned.
+    - name: Roles - Ensure Coral TPU Role has been provisioned.
+      ansible.builtin.import_role:
+        name: owendemooy.coraltpu
+      when: '"coraltpu" in functions'
+
+    # USERS - Ensure the required users are in the correct groups
+    - name: Ensure the users exists.
+      ansible.builtin.user:
+        name: "{{ item.key }}"
+        comment: "{{ item.value.displayname }}"
+        groups: "{{ item.value.groups }}"
+        create_home: true
+        append: true
+      with_items: "{{ users | dict2items }}"
+      no_log: true

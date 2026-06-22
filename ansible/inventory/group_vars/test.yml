@@ -1,0 +1,116 @@
+---
+functions:
+  - docker
+  - samba
+  - storage
+  - nut-client
+  - backup
+  - coraltpu
+
+# apt_packages - variable used to define what additional packages are required
+apt_packages:
+  - acl
+  - wakeonlan
+
+# users - variable used to create the required users on host
+users:
+  smb:
+    displayname: Samba User
+    groups:
+    key: 
+  argus:
+    displayname: Argus (Agent)
+    groups: "sudo,docker"
+    key: #{SSH_PUBKEY_ARGUS}#
+
+
+# host_directories - variable used to create the required folders on host
+host_directories:
+  config:
+    path: /config
+    acls: 
+      - user::rwx
+      - group::rwx
+      - other::rwx
+      - default:user::rwx
+      - default:group::rwx
+      - default:other::rwx
+  docker:
+    path: /docker
+    acls:
+      - user::rwx
+      - group::rwx
+      - other::rwx
+      - default:user::rwx
+      - default:group::rwx
+      - default:other::rwx
+  storage:
+    path: /mnt/storage
+    acls:
+      - user::rwx
+      - group::rwx
+      - other::rwx
+      - default:user::rwx
+      - default:group::rwx
+      - default:other::rwx
+
+
+# samba - variable used to configure the required samba users and shares
+samba_users:
+  smb:
+    password: #{SAMBA_SMB_PASSWORD}#
+samba_shares:
+  config:
+    path: "/config"
+    users:
+      - "smb"
+    available: "yes"
+    browsable: "yes"
+    readonly: "no"
+    writable: "yes"
+  docker:
+    path: "/docker"
+    users:
+      - "smb"
+    available: "yes"
+    browsable: "yes"
+    readonly: "no"
+    writable: "yes"
+  storage:
+    path: "/mnt/storage"
+    users:
+      - "smb"
+    available: "yes"
+    browsable: "yes"
+    readonly: "no"
+    writable: "yes"
+
+# storage - variable used to configure directories and mounts for storage
+storage_disks:
+  disk1:
+    path: /mnt/array/disk1
+    src: LABEL=ARRAY-DISK1
+    fstype: ext4
+  disk2:
+    path: /mnt/array/disk2
+    src: LABEL=ARRAY-DISK2
+    fstype: ext4
+  disk3:
+    path: /mnt/array/disk3
+    src: LABEL=ARRAY-DISK3
+    fstype: ext4 
+  disk4:
+    path: /mnt/array/disk4
+    src: LABEL=ARRAY-DISK4
+    fstype: ext4
+  disk5:
+    path: /mnt/array/parity1
+    src: LABEL=ARRAY-PARITY1
+    fstype: ext4
+storage_mergerfs:
+  storage:
+    path: /mnt/storage
+    src: /mnt/array/disk*
+    fstype: fuse.mergerfs
+    opts: defaults,nonempty,allow_other,use_ino,cache.files=off,moveonenospc=true,category.create=mfs,dropcacheonclose=true,minfreespace=1G,posix_acl=true,fsname=MergerFS
+
