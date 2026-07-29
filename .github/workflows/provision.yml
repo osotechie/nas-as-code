@@ -167,7 +167,10 @@ jobs:
           ANSIBLE_FORCE_COLOR: "false"
         run: |
           set -o pipefail
-          ansible-playbook playbooks/provision.yml --limit ${{ vars.ENV_NAME }} 2>&1 | tee ansible-output.txt
+          ansible-playbook playbooks/provision.yml \
+            --limit ${{ vars.ENV_NAME }} \
+            -e "ansible_host=${{ vars.HOST_IP }}" \
+            -e "ansible_user=${{ vars.HOST_USER }}" 2>&1 | tee ansible-output.txt
           echo "ansible_exit=0" >> $GITHUB_OUTPUT
         continue-on-error: true
 

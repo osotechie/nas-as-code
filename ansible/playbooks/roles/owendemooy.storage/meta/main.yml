@@ -1,5 +1,7 @@
 ---
 galaxy_info:
+  role_name: storage
+  namespace: owendemooy
   author: owendemooy
   description: Provision Storage
   # company: your company (optional)

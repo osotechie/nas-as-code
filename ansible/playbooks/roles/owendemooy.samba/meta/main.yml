@@ -1,5 +1,7 @@
 ---
 galaxy_info:
+  role_name: samba
+  namespace: owendemooy
   author: owendemooy
   description: Provision Samba
   # company: your company (optional)

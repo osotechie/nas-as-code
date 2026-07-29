@@ -1,5 +1,7 @@
 ---
 galaxy_info:
+  role_name: nas_backup
+  namespace: owendemooy
   author: owendemooy
   description: Provision Backup
   # company: your company (optional)
