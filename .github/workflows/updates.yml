@@ -160,7 +160,74 @@ jobs:
       # ===========================
       # Run Ansible Playbook to deploy to NAS
       - name: Run Ansible Playbook
-        run: "ansible-playbook playbooks/updates.yml --limit ${{ vars.ENV_NAME}}"
+        id: ansible
+        env:
+          ANSIBLE_STDOUT_CALLBACK: default
+          ANSIBLE_CALLBACK_RESULT_FORMAT: yaml
+          ANSIBLE_FORCE_COLOR: "false"
+        run: |
+          set -o pipefail
+          ansible-playbook playbooks/updates.yml \
+            --limit ${{ vars.ENV_NAME }} \
+            -e "ansible_host=${{ vars.HOST_IP }}" \
+            -e "ansible_user=${{ vars.HOST_USER }}" 2>&1 | tee ansible-output.txt
+          echo "ansible_exit=0" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      # STEP - Generate deployment report
+      # ==================================
+      # Parse Ansible output into a readable GitHub Actions Job Summary
+      - name: Generate deployment report
+        if: always()
+        run: |
+          EXIT_CODE=${{ steps.ansible.outcome == 'success' && '0' || '1' }}
+
+          echo "## 🚀 Updates — \`${{ vars.ENV_NAME }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$EXIT_CODE" = "0" ]; then
+            echo "### ✅ Result: **SUCCESS**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ Result: **FAILED**" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Extract and format the PLAY RECAP into a table
+          if grep -q "PLAY RECAP" ansible-output.txt; then
+            echo "### Play Recap" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Host | OK | Changed | Unreachable | Failed | Skipped | Rescued | Ignored |" >> $GITHUB_STEP_SUMMARY
+            echo "|------|----:|--------:|------------:|-------:|--------:|--------:|--------:|" >> $GITHUB_STEP_SUMMARY
+            sed -n '/PLAY RECAP/,/^$/p' ansible-output.txt | grep -v "PLAY RECAP" | grep -v "^$" | while read -r line; do
+              HOST=$(echo "$line" | awk -F: '{print $1}' | xargs)
+              OK=$(echo "$line" | grep -oP 'ok=\K[0-9]+' || echo "0")
+              CHANGED=$(echo "$line" | grep -oP 'changed=\K[0-9]+' || echo "0")
+              UNREACH=$(echo "$line" | grep -oP 'unreachable=\K[0-9]+' || echo "0")
+              FAILED=$(echo "$line" | grep -oP 'failed=\K[0-9]+' || echo "0")
+              SKIPPED=$(echo "$line" | grep -oP 'skipped=\K[0-9]+' || echo "0")
+              RESCUED=$(echo "$line" | grep -oP 'rescued=\K[0-9]+' || echo "0")
+              IGNORED=$(echo "$line" | grep -oP 'ignored=\K[0-9]+' || echo "0")
+              echo "| \`$HOST\` | $OK | $CHANGED | $UNREACH | $FAILED | $SKIPPED | $RESCUED | $IGNORED |" >> $GITHUB_STEP_SUMMARY
+            done
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Full log in a collapsible section
+          echo "<details><summary>📋 Full Ansible Output</summary>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```yaml' >> $GITHUB_STEP_SUMMARY
+          cat ansible-output.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "</details>" >> $GITHUB_STEP_SUMMARY
+
+      # STEP - Fail on playbook error
+      # ==============================
+      # Ensure the workflow fails if the playbook had errors
+      - name: Fail on playbook error
+        if: steps.ansible.outcome != 'success'
+        run: |
+          echo "::error::Ansible playbook failed. See the job summary for details."
+          exit 1
 
       # STEP - Discconect from Wireguard
       # ================================

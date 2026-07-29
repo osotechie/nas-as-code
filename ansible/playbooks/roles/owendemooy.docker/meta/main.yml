@@ -1,5 +1,7 @@
 ---
 galaxy_info:
+  role_name: docker
+  namespace: owendemooy
   author: owendemooy
   description: Provision Docker
   # company: your company (optional)

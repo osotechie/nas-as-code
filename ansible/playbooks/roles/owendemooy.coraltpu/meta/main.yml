@@ -1,5 +1,7 @@
 ---
 galaxy_info:
+  role_name: coraltpu
+  namespace: owendemooy
   author: owendemooy
   description: Coral TPU
   # company: your company (optional)

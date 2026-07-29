@@ -1,5 +1,7 @@
 ---
 galaxy_info:
+  role_name: nut_client
+  namespace: owendemooy
   author: owendemooy
   description: NUT Client
   # company: your company (optional)
