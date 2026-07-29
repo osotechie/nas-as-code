@@ -22,7 +22,7 @@ jobs:
       fail-fast: true
       max-parallel: 1
       matrix:
-        environment: [test, production]
+        environment: [test]
     environment: ${{ matrix.environment }}
     defaults:
       run:
