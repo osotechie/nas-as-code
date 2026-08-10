@@ -121,7 +121,7 @@ jobs:
       # Uploads ansible-lint SARIF results so findings appear as code scanning alerts and inline PR annotations
       - name: Upload SARIF to Code Scanning
         if: always()
-        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v3
+        uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v3
         with:
           sarif_file: ansible/lint-results.sarif
           category: ansible-lint
@@ -150,7 +150,7 @@ jobs:
       # Upload the results of the Microsoft Security DevOps to the repo
       - name: Upload Security SARIF
         if: always()
-        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v3
+        uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v3
         with:
           sarif_file: ${{ steps.msdo.outputs.sarifFile }}
           category: security-devops
