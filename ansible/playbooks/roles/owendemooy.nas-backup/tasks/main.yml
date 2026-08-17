@@ -33,8 +33,8 @@
 - name: Add Restic Repo Password to Scripts
   ansible.builtin.lineinfile:
     path: "{{ item.path }}"
-    regexp: "^RESTIC_PASSWORD=.*"
-    line: "exportRESTIC_PASSWORD={{ restic_password }}"
+    regexp: "^export RESTIC_PASSWORD=.*$"
+    line: "export RESTIC_PASSWORD={{ restic_password }}"
     state: present
   loop: "{{ update_scripts.files }}"
 
