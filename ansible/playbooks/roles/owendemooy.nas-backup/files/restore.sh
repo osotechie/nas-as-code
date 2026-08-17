@@ -3,12 +3,17 @@
 #Version 1.0
 #START
 
-FILENAME=NAS-Backup.tar.gz                    # Define Backup file name
-DES_DIR=/mnt/storage/backups/nas              # Destination of backup file
+DES_DIR=/docker                           		# Location of Data to be backed up
+SRC_DIR=/mnt/storage/backups/nas-repo       	# Destination of backup file
 
+export RESTIC_PASSWORD=
 
-#Backup Container data
-echo 'Restoring persistant data for Containers'
-tar xvzf $DES_DIR/$FILENAME -C / 
+echo $(date)'   Starting Restore'
+echo $(date)'   -----------------------------------------------------------------------------------'
+
+#Restore Container data
+echo $(date)'    Restoring persistant data for Containers from backup'
+echo restic -r $SRC_DIR --verbose restore latest --target $DES_DIR
+restic -r $SRC_DIR --verbose restore latest --target $DES_DIR
 
 #END

@@ -4,5 +4,9 @@ backup_directories:
     path: /mnt/backup
   snapshot:
     path: /mnt/backup/snapshot
-  remote:
-    path: /mnt/backup/remote
+  restic_repo:
+    path: /mnt/storage/backups/nas-repo
+
+backup_groups:
+  restic-readers:
+    gid: 9999
