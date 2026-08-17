@@ -4,7 +4,7 @@ functions:
   - samba
   - storage
   - nut-client
-  - backup
+  - nas-backup
   - coraltpu
 
 # apt_packages - variable used to define what additional packages are required
