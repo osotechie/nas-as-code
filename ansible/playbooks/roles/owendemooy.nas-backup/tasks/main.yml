@@ -24,7 +24,7 @@
     dest: /config
     mode: "0777"
 
-- name: Get Scripts to Update 
+- name: Get Scripts to Update
   ansible.builtin.find:
     paths: /config
     patterns: "*.sh"
