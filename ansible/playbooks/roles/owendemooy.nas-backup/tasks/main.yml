@@ -1,10 +1,15 @@
 ---
 # tasks file for owendemooy.backup
-- name: Ensure Backup related packages are installed.
+- name: Ensure required packages are installed.
   ansible.builtin.apt:
-    name:
-      - wakeonlan
+    name: [restic, cron]
+
+- name: Create Backup Readers Group
+  ansible.builtin.group:
+    name: "{{ item.key }}"
     state: present
+    gid: "{{ item.value.gid }}"
+  with_items: "{{ backup_groups | dict2items }}"
 
 - name: Directories - Ensure required directories exist.
   ansible.builtin.file:
@@ -18,6 +23,14 @@
     src: "{{ role_path }}/files/"
     dest: /config
     mode: "0777"
+
+- name: Add Restic Repo Password.
+  ansible.builtin.lineinfile:
+    path: "/config/*.sh"
+    regexp: "^RESTIC_PASSWORD=.*"
+    line: "exportRESTIC_PASSWORD={{ restic_password }}"
+    state: present
+    mode: "0640"
 
 - name: Ensure Schedule Task exists for Backup Job
   ansible.builtin.cron:
