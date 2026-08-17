@@ -24,13 +24,19 @@
     dest: /config
     mode: "0777"
 
-- name: Add Restic Repo Password.
+- name: Get Scripts to Update
+  ansible.builtin.find:
+    paths: /config
+    patterns: "*.sh"
+  register: update_scripts
+
+- name: Add Restic Repo Password to Scripts
   ansible.builtin.lineinfile:
-    path: "/config/*.sh"
+    path: "{{ item.path }}"
     regexp: "^RESTIC_PASSWORD=.*"
     line: "exportRESTIC_PASSWORD={{ restic_password }}"
     state: present
-    mode: "0640"
+  loop: "{{ update_scripts.files }}"
 
 - name: Ensure Schedule Task exists for Backup Job
   ansible.builtin.cron:
