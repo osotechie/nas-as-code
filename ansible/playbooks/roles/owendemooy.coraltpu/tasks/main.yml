@@ -17,16 +17,3 @@
     deb: /tmp/gasket-dkms_1.0-18_all.deb
     state: present
   when: "'gasket-dkms' not in ansible_facts.packages"
-
-- name: Ensure Google Cloud APT Key and Repository have been added.
-  ansible.builtin.deb822_repository:
-    name: CorelEdgeTPU
-    uris: https://packages.cloud.google.com/apt
-    suites: 'coral-edgetpu-stable'
-    components: main
-    signed_by: https://packages.cloud.google.com/apt/doc/apt-key.gpg
-
-- name: Ensure Coral Edge TPU is installed.
-  ansible.builtin.apt:
-    name: [libedgetpu1-std]
-    update_cache: true
