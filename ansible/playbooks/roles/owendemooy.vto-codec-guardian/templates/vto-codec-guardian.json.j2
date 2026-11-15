@@ -1,0 +1,8 @@
+{
+  "base_url": {{ vto_codec_guardian_base_url | to_json }},
+  "username": {{ vto_codec_guardian_username | to_json }},
+  "password": {{ vto_codec_guardian_password | to_json }},
+  "timeout_seconds": {{ vto_codec_guardian_timeout_seconds | int }},
+  "desired_compression": {{ vto_codec_guardian_desired_compression | to_json }},
+  "desired_frequency": {{ vto_codec_guardian_desired_frequency | string | to_json }}
+}

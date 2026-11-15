@@ -1,0 +1,47 @@
+---
+# tasks file for owendemooy.vto-codec-guardian
+- name: Ensure VTO Codec Guardian dependencies are installed.
+  ansible.builtin.apt:
+    name: [cron, python3, util-linux]
+    state: present
+
+- name: Ensure VTO Codec Guardian script is installed.
+  ansible.builtin.copy:
+    src: vto_codec_guardian.py
+    dest: "{{ vto_codec_guardian_script_path }}"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Validate enabled VTO Codec Guardian configuration.
+  ansible.builtin.assert:
+    that:
+      - vto_codec_guardian_base_url | length > 0
+      - vto_codec_guardian_username | length > 0
+      - vto_codec_guardian_password | length > 0
+      - vto_codec_guardian_desired_compression | length > 0
+      - vto_codec_guardian_desired_frequency | string | length > 0
+    fail_msg: VTO Codec Guardian requires its URL, credentials, and desired codec values.
+  when: vto_codec_guardian_enabled | bool
+  no_log: true
+
+- name: Ensure VTO Codec Guardian configuration is installed.
+  ansible.builtin.template:
+    src: vto-codec-guardian.json.j2
+    dest: "{{ vto_codec_guardian_config_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+  when: vto_codec_guardian_enabled | bool
+  no_log: true
+
+- name: Ensure VTO Codec Guardian schedule is configured.
+  ansible.builtin.cron:
+    name: VTO Codec Guardian
+    user: root
+    minute: "{{ vto_codec_guardian_schedule_minute }}"
+    job: >-
+      /usr/bin/flock -n /run/lock/vto-codec-guardian.lock
+      {{ vto_codec_guardian_script_path }}
+      --config {{ vto_codec_guardian_config_path }}
+    state: "{{ (vto_codec_guardian_enabled | bool) | ternary('present', 'absent') }}"

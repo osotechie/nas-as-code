@@ -6,6 +6,7 @@ functions:
   - nut-client
   - nas-backup
   - coraltpu
+  - vto-codec-guardian
 
 # apt_packages - variable used to define what additional packages are required
 apt_packages:
@@ -122,3 +123,9 @@ nut_client_password: #{NUT_CLIENT_PASSWORD}#
 
 # backup - variables used to configure the backup role
 restic_password: #{RESTIC_PASSWORD}#
+
+# vto-codec-guardian - enforce the main audio codec required for two-way talk
+vto_codec_guardian_enabled: true
+vto_codec_guardian_base_url: http://10.1.253.3
+vto_codec_guardian_username: #{VTO_GATE_USERNAME}#
+vto_codec_guardian_password: #{VTO_GATE_PASSWORD}#

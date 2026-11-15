@@ -1,0 +1,11 @@
+---
+galaxy_info:
+  role_name: vto_codec_guardian
+  namespace: owendemooy
+  author: owendemooy
+  description: Enforce the Dahua VTO audio codec required for two-way talk
+  license: MIT
+  min_ansible_version: "2.1"
+  galaxy_tags: []
+
+dependencies: []

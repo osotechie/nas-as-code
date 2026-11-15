@@ -120,7 +120,7 @@ The `provision.yml` playbook performs a full host setup:
    | `owendemooy.nut-client` | `nut-client` | UPS monitoring via NUT |
    | `owendemooy.nas-backup` | `nas-backup` | Nightly rsync backup with wake-on-LAN |
    | `owendemooy.coraltpu` | `coraltpu` | Google Coral Edge TPU drivers |
-
+   | `owendemooy.vto-codec-guardian` | `vto-codec-guardian` | Maintains the Dahua VTO codec required for two-way talk |
 <br>
 
 ### ♻️ Updates
