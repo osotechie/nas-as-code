@@ -125,7 +125,4 @@ nut_client_password: #{NUT_CLIENT_PASSWORD}#
 restic_password: #{RESTIC_PASSWORD}#
 
 # vto-codec-guardian - enforce the main audio codec required for two-way talk
-vto_codec_guardian_enabled: true
-vto_codec_guardian_base_url: http://10.1.253.3
-vto_codec_guardian_username: #{VTO_GATE_USERNAME}#
-vto_codec_guardian_password: #{VTO_GATE_PASSWORD}#
+vto_codec_guardian_enabled: false
