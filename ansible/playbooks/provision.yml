@@ -92,6 +92,12 @@
         name: owendemooy.coraltpu
       when: '"coraltpu" in functions'
 
+    # ROLES - Ensure VTO Codec Guardian Role has been provisioned.
+    - name: Roles - Ensure VTO Codec Guardian Role has been provisioned.
+      ansible.builtin.import_role:
+        name: owendemooy.vto-codec-guardian
+      when: '"vto-codec-guardian" in functions'
+
     # USERS - Ensure the required users are in the correct groups
     - name: Ensure the users exists.
       ansible.builtin.user:

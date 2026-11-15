@@ -1,0 +1,11 @@
+---
+vto_codec_guardian_enabled: false
+vto_codec_guardian_base_url: http://127.0.0.1
+vto_codec_guardian_username: ""
+vto_codec_guardian_password: ""
+vto_codec_guardian_timeout_seconds: 10
+vto_codec_guardian_desired_compression: G.711A
+vto_codec_guardian_desired_frequency: "8000"
+vto_codec_guardian_schedule_minute: "*/5"
+vto_codec_guardian_script_path: /usr/local/sbin/vto-codec-guardian
+vto_codec_guardian_config_path: /etc/vto-codec-guardian.json
